@@ -1,0 +1,2 @@
+scenario,descriptor,tariff_shape,configuration,delta,size_kWh,CAPEX_EUR,Annual_Rev_EUR,Annual_OPEX_EUR,Annual_CF_EUR,NPV_EUR,IRR_%,Payback_yr,Viable,hurdle_rate_%
+scenario_29,max_invest,flat,ex-post,0.07,100.0,24500000.0,1708636.0,145250.0,1563386.0,-21653976.0,-7.43,,False,54.21

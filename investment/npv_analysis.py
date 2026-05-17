@@ -1,19 +1,19 @@
 """
 investment/npv_analysis.py
 ==========================
-Calcul des indicateurs financiers (NPV, IRR, Payback) d'un projet de
-stockage par batteries pour une taille donnée et un tarif donné.
+Compute financial indicators (NPV, IRR, Payback) for a battery storage
+project with a given size and tariff.
 
-Flux de trésorerie annuel :
-    CF_t = Revenu_annuel - OPEX_annuel
+Annual cash flow:
+    CF_t = annual_revenue - annual_OPEX
 
-Investissement initial (CAPEX) :
-    CAPEX = cap_cost [€/kWh] × size [kWh]
+Initial investment (CAPEX):
+    CAPEX = cap_cost [EUR/kWh] x size [kWh]
 
-NPV = -CAPEX + Σ_{t=1}^{N} CF_t / (1 + r)^t   où r = hurdle_rate
+NPV = -CAPEX + sum_{t=1}^{N} CF_t / (1 + r)^t, where r = hurdle_rate
 
-On estime le revenu annuel à partir du résultat d'optimisation du dispatch
-(objectif de l'optimiseur = profit brut de l'arbitrage + tarif).
+Annual revenue is estimated from the dispatch optimization result
+(optimizer objective = gross arbitrage profit + tariff).
 """
 
 from __future__ import annotations
@@ -30,13 +30,13 @@ from typing import Optional
 
 @dataclass
 class ProjectFinancials:
-    """Paramètres financiers et techniques du projet."""
-    size_kwh: float          # capacité énergie [kWh]
-    storage_duration: float  # durée de stockage [h]
-    cap_cost_per_kwh: float  # CAPEX spécifique [€/kWh]
-    annual_om_per_kw: float  # OPEX annuel [€/kW]
-    lifetime: int            # durée de vie [années]
-    hurdle_rate: float       # taux d'actualisation
+    """Financial and technical project parameters."""
+    size_kwh: float          # energy capacity [kWh]
+    storage_duration: float  # storage duration [h]
+    cap_cost_per_kwh: float  # specific CAPEX [EUR/kWh]
+    annual_om_per_kw: float  # annual OPEX [EUR/kW]
+    lifetime: int            # lifetime [years]
+    hurdle_rate: float       # discount rate
 
     @property
     def power_kw(self) -> float:
@@ -53,10 +53,10 @@ class ProjectFinancials:
 
 @dataclass
 class NPVResult:
-    """Résultat de l'analyse financière pour une taille donnée."""
+    """Financial analysis result for a given size."""
     size_kwh: float
     capex: float
-    annual_revenue: float   # revenu moyen annualisé (dispatch + tarif)
+    annual_revenue: float   # average annualized revenue (dispatch + tariff)
     annual_opex: float
     annual_cashflow: float
     npv: float
@@ -79,29 +79,29 @@ class NPVResult:
 
 
 # ---------------------------------------------------------------------------
-# Fonctions de calcul
+# Calculation functions
 # ---------------------------------------------------------------------------
 
 def _irr(cashflows: np.ndarray, max_iter: int = 1000, tol: float = 1e-6) -> Optional[float]:
     """
-    Calcule l'IRR par la méthode de Newton-Raphson.
-    cashflows[0] doit être négatif (investissement initial).
-    Retourne None si aucune solution n'est trouvée dans [−99 %, +500 %].
+    Compute IRR using the Newton-Raphson method.
+    cashflows[0] must be negative (initial investment).
+    Return None if no solution is found within [-99%, +500%].
     """
-    # Borne de recherche
+    # Search bound
     f = lambda r: np.sum(cashflows / (1 + r) ** np.arange(len(cashflows)))
     df = lambda r: np.sum(
         -np.arange(len(cashflows)) * cashflows / (1 + r) ** (np.arange(len(cashflows)) + 1)
     )
 
-    r = 0.10  # point de départ
+    r = 0.10  # starting point
     for _ in range(max_iter):
         fr = f(r)
         dfr = df(r)
         if abs(dfr) < 1e-12:
             break
         r_new = r - fr / dfr
-        # Garder r dans des limites raisonnables
+        # Keep r within reasonable bounds.
         r_new = max(-0.99, min(r_new, 5.0))
         if abs(r_new - r) < tol:
             return r_new
@@ -110,7 +110,7 @@ def _irr(cashflows: np.ndarray, max_iter: int = 1000, tol: float = 1e-6) -> Opti
 
 
 def _payback(cashflows: np.ndarray) -> Optional[float]:
-    """Délai de récupération (années). cashflows[0] < 0."""
+    """Payback period in years. cashflows[0] < 0."""
     cumulative = np.cumsum(cashflows)
     positive_idx = np.where(cumulative > 0)[0]
     if len(positive_idx) == 0:
@@ -118,7 +118,7 @@ def _payback(cashflows: np.ndarray) -> Optional[float]:
     idx = positive_idx[0]
     if idx == 0:
         return 0.0
-    # interpolation linéaire
+    # Linear interpolation
     pb = idx - cumulative[idx - 1] / (cumulative[idx] - cumulative[idx - 1])
     return pb
 
@@ -128,13 +128,13 @@ def compute_npv(
     annual_revenue: float,
 ) -> NPVResult:
     """
-    Calcule NPV, IRR et Payback pour un projet donné.
+    Compute NPV, IRR, and Payback for a given project.
 
     Parameters
     ----------
     financials : ProjectFinancials
     annual_revenue : float
-        Revenu annuel brut estimé [€] (issu du dispatch optimizer).
+        Estimated gross annual revenue [EUR] from the dispatch optimizer.
 
     Returns
     -------
@@ -142,7 +142,7 @@ def compute_npv(
     """
     cf_annual = annual_revenue - financials.annual_opex
 
-    # Flux : [-CAPEX, CF1, CF2, …, CF_N]
+    # Cash flows: [-CAPEX, CF1, CF2, ..., CF_N]
     cashflows = np.array(
         [-financials.capex] + [cf_annual] * financials.lifetime
     )
@@ -154,10 +154,10 @@ def compute_npv(
     # IRR
     irr = _irr(cashflows)
 
-    # Payback (non actualisé)
+    # Payback, undiscounted
     payback = _payback(cashflows)
 
-    # Viabilité : NPV > 0
+    # Viability: NPV > 0
     is_viable = npv > 0
 
     return NPVResult(
@@ -179,31 +179,31 @@ def annualize_dispatch_revenue(
     end_year: int,
 ) -> float:
     """
-    Estime le revenu annuel moyen à partir des résultats de dispatch.
+    Estimate average annual revenue from dispatch results.
 
-    Le revenu d'une année = Σ_t [ (Pd_t - Pc_t) × (base_price_t + tariff_t) ]
-    On fait la moyenne sur l'horizon de simulation.
+    Revenue for one year = sum_t [(Pd_t - Pc_t) x (base_price_t + tariff_t)]
+    The value is averaged over the simulation horizon.
 
     Parameters
     ----------
     storage_result : pd.DataFrame
-        DataFrame issu de runStorageDispatch* (colonnes : Pd, Pc, base_price, tariff, year).
+        DataFrame from runStorageDispatch* with columns: Pd, Pc, base_price, tariff, year.
     start_year, end_year : int
-        Horizon de simulation.
+        Simulation horizon.
 
     Returns
     -------
-    float : revenu annuel moyen [€]
+    float : average annual revenue [EUR]
     """
     revenues = []
     for year in range(start_year, end_year + 1):
         df_year = storage_result[storage_result["year"] == year]
         if df_year.empty:
             continue
-        # Pc est déjà négatif dans storage_result (convention de signe du core)
-        # dispatch = Pd + Pc  (Pc < 0 → charge)
-        # revenu = Σ dispatch × price   mais on préfère recalculer proprement :
-        #   revenu = Σ (Pd - |Pc|) × price   avec price = base_price + tariff
+        # Pc is already negative in storage_result, following the core sign convention.
+        # dispatch = Pd + Pc  (Pc < 0 means charge)
+        # revenue = sum(dispatch x price), but we prefer to recompute it explicitly:
+        #   revenue = sum((Pd - |Pc|) x price), with price = base_price + tariff
         rev = ((df_year["Pd"] + df_year["Pc"]) * df_year["price"]).sum()
         revenues.append(rev)
 

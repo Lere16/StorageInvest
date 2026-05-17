@@ -96,6 +96,7 @@ def bat_optimize_(params, price_table, df_load, scenario, size, base_tariff, VOL
     defobj = Equation(bat, "defobj")
     
     
+    
     constESS[t] = (
         SOC[t]
         == SOC0.where[Ord(t) == 1]

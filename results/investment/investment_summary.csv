@@ -1,0 +1,2 @@
+scenario,descriptor,tariff_shape,configuration,delta,hurdle_rate_%,max_viable_size_kWh,max_viable_NPV_EUR,max_viable_IRR_%,max_viable_payback_yr,first_nonviable_size_kWh,first_nonviable_NPV_EUR
+scenario_29,max_invest,flat,ex-post,0.07,54.21,0,,,,100.0,-21653976.0

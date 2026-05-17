@@ -1,15 +1,16 @@
 """
-main.py  —  Point d'entrée du projet de dispatch + investissement batterie
-===========================================================================
-Étapes disponibles :
+main.py  -  Entry point for the battery dispatch and investment project
+========================================================================
+Available steps:
 
-  STEP 0  Calcul du hurdle rate (CAPM / WACC)
-  STEP 1  Comparaison du dispatch pour différents schémas tarifaires
-  STEP 2  Analyse de sensibilité sur delta
-  STEP 3  Analyse de sensibilité sur share
-  STEP 4  Comparaison ex-ante vs ex-post
-  STEP 5  Frontière d'investissement (module investissement)
+  STEP 0  Hurdle rate calculation (CAPM / WACC)
+  STEP 1  Dispatch comparison across tariff schemes
+  STEP 2  Sensitivity analysis on delta
+  STEP 3  Sensitivity analysis on share
+  STEP 4  Ex-ante vs ex-post comparison
+  STEP 5  Investment frontier (investment module)
 """
+
 
 from core import (
     readStorageDispatchScenario,
@@ -18,7 +19,7 @@ from core import (
     runStorageDispatchSensitivitydelta,
     runStorageDispatchSensitivityShare,
     runStorageConfiguration,
-    # ── Nouveau ──────────────────────────────
+    # -- New ------------------------------
     computeHurdleRate,
     runInvestmentFrontier,
 )
@@ -31,7 +32,7 @@ from results_analysis import (
 )
 
 # ---------------------------------------------------------------------------
-# Lecture des scénarios et des données
+# Read scenarios and data
 # ---------------------------------------------------------------------------
 SCENARIO_LIST = list(range(1, 30))
 SCENARIOS, params = readStorageDispatchScenario(SCENARIO_LIST)
@@ -45,39 +46,40 @@ DF_LOAD, DF_PRICE = readLoadPrice(area)
 # ---------------------------------------------------------------------------
 # STEP 0 : Hurdle Rate (CAPM / WACC)
 # ---------------------------------------------------------------------------
-print("STEP 0 : CALCUL DU HURDLE RATE (CAPM / WACC)")
+print("STEP 0 : HURDLE RATE CALCULATION (CAPM / WACC)")
 HR_RESULT = computeHurdleRate(
     params,
     scenario="scenario_1",
-    # Valeurs par défaut — à ajuster selon le contexte de marché :
-    beta=0.85,             # risque systématique du stockage (≈ utilités)
-    market_premium=0.055,  # prime de risque de marché Europe
-    equity_share=0.40,     # structure de capital typique projet énergie
-    cost_of_debt=0.045,    # coût de la dette (OAT + spread)
-    tax_rate=0.30,
+    # Default values - adjust according to the market context:
+    beta=0.85,             # systematic risk of storage, close to utilities
+    market_premium=0.055,  # European market risk premium
+    equity_share=0.40,     # typical capital structure for an energy project
+    cost_of_debt=0.02,    # cost of debt (OAT + spread)
+    tax_rate= 0.05,
 )
 
 
 # ---------------------------------------------------------------------------
-# STEP 1 : Comparaison dispatch par schéma tarifaire
+# STEP 1 : Dispatch comparison by tariff scheme
 # ---------------------------------------------------------------------------
-print("\nSTEP 1 : STORAGE DISPATCH INCLUDING TARIFF SIGNALS")
-scenario_cases  = SCENARIOS[:4]
-selected_years  = ["2015", "2016", "2017", "2018", "2019", "2020", "2021", "2022", "2023"]
 
-STORAGE_RESULT1 = runStorageDispatchCases(
-    params, scenario_cases, DF_PRICE, base_tariff, DF_LOAD
-)
-plotStorageDispatchCases(scenario_cases, STORAGE_RESULT1, selected_years, params)
+#print("\nSTEP 1 : STORAGE DISPATCH INCLUDING TARIFF SIGNALS")
+#scenario_cases  = SCENARIOS[:4]
+#selected_years  = ["2015", "2016", "2017", "2018", "2019", "2020", "2021", "2022", "2023"]
+
+#STORAGE_RESULT1 = runStorageDispatchCases(
+#    params, scenario_cases, DF_PRICE, base_tariff, DF_LOAD
+#)
+#plotStorageDispatchCases(scenario_cases, STORAGE_RESULT1, selected_years, params)
 
 
 # ---------------------------------------------------------------------------
-# STEP 5 : Frontière d'investissement  ← NOUVEAU
+# STEP 5 : Investment frontier  <- NEW
 # ---------------------------------------------------------------------------
-print("\nSTEP 5 : FRONTIÈRE D'INVESTISSEMENT PAR SCHÉMA TARIFAIRE")
+print("\nSTEP 5 : INVESTMENT FRONTIER BY TARIFF SCHEME")
 
-# Scénarios max_invest (indices 28-44 dans le CSV → scenario_29 à scenario_45)
-# Adaptez la plage selon votre fichier.
+# max_invest scenarios (indices 28-44 in the CSV -> scenario_29 to scenario_45)
+# Adjust the range according to your file.
 invest_scenario_list = list(range(29, 46))
 invest_scenario_list = [s for s in invest_scenario_list if s <= len(SCENARIOS)]
 INVEST_SCENARIOS = [list(params.keys())[i - 1] for i in invest_scenario_list
@@ -89,21 +91,21 @@ if INVEST_SCENARIOS:
         scenario_cases=INVEST_SCENARIOS,
         DF_PRICE=DF_PRICE,
         DF_LOAD=DF_LOAD,
-        hr_result=HR_RESULT,
+        hr_result= HR_RESULT,
         output_dir="results/investment",
         verbose=True,
     )
-    print("\nTableau de synthèse sauvegardé dans results/investment/investment_summary.csv")
+    print("\nSummary table saved to results/investment/investment_summary.csv")
 else:
-    print("  Aucun scénario d'investissement trouvé — vérifiez SCENARIO_LIST.")
+    print("  No investment scenario found - check SCENARIO_LIST.")
 
 
 # ---------------------------------------------------------------------------
-# Étapes commentées (décommenter selon besoin)
+# Commented steps (uncomment as needed)
 # ---------------------------------------------------------------------------
 
 '''
-print("STEP 2 : SENSITIVITY ANALYSIS FOR STORAGE DISPATCH — delta")
+print("STEP 2 : SENSITIVITY ANALYSIS FOR STORAGE DISPATCH - delta")
 scenario_cases  = SCENARIOS[4:12]
 STORAGE_RESULT2 = runStorageDispatchSensitivitydelta(
     params, scenario_cases, DF_PRICE, base_tariff, DF_LOAD)
@@ -112,7 +114,7 @@ plotStorageDispatchSensitivitydelta(
 '''
 
 '''
-print("STEP 3 : SENSITIVITY ANALYSIS — share")
+print("STEP 3 : SENSITIVITY ANALYSIS - share")
 scenario_cases  = SCENARIOS[12:24]
 STORAGE_RESULT3 = runStorageDispatchSensitivityShare(
     params, scenario_cases, DF_PRICE, base_tariff, DF_LOAD)

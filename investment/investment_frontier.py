@@ -1,22 +1,23 @@
 """
 investment/investment_frontier.py
 ==================================
-Recherche de la frontière d'investissement optimal pour chaque schéma tarifaire.
+Search for the optimal investment frontier for each tariff scheme.
 
-Algorithme
-----------
-1. Pour chaque scénario (= schéma tarifaire) :
-   a. Partir d'une taille minimale (step_size).
-   b. Lancer le dispatch optimizer pour cette taille.
-   c. Calculer NPV via npv_analysis.compute_npv.
-   d. Si NPV > 0 → enregistrer, incrémenter la taille et recommencer.
-   e. Si NPV ≤ 0 → la frontière est atteinte : stopper.
+Algorithm
+---------
 
-2. Résumer : taille maximale viable, NPV, IRR, payback par scénario.
+1. For each scenario (= tariff scheme):
+   a. Start from a minimum size (step_size).
+   b. Run the dispatch optimizer for this size.
+   c. Compute NPV via npv_analysis.compute_npv.
+   d. If NPV > 0, record it, increase the size, and repeat.
+   e. If NPV <= 0, the frontier has been reached: stop.
 
-Le module expose une fonction principale :
+2. Summarize: maximum viable size, NPV, IRR, and payback by scenario.
+
+The module exposes one main function:
     run_investment_frontier(params, scenario_cases, DF_PRICE, DF_LOAD,
-                            hr_result, output_dir) → pd.DataFrame
+                            hr_result, output_dir) -> pd.DataFrame
 """
 
 from __future__ import annotations
@@ -41,7 +42,7 @@ from investment.npv_analysis import (
 
 def _build_financials(params: dict, scenario: str, size_kwh: float,
                       hurdle_rate: float) -> ProjectFinancials:
-    """Construit ProjectFinancials depuis le dict params."""
+    """Build ProjectFinancials from the params dict."""
     p1 = params["scenario_1"]["global"]
     return ProjectFinancials(
         size_kwh=size_kwh,
@@ -65,8 +66,8 @@ def _run_dispatch_for_size(
     start: int,
     end: int,
 ) -> pd.DataFrame:
-    """Lance le dispatch optimizer sur l'horizon et retourne df_combined."""
-    # Import ici pour éviter la circularité
+    """Run the dispatch optimizer over the horizon and return df_combined."""
+    # Import here to avoid circular imports.
     from storage_dispatch.batterydispatch import bat_optimize_
 
     df_combined = pd.DataFrame()
@@ -92,7 +93,7 @@ def _run_dispatch_for_size(
 
 
 # ---------------------------------------------------------------------------
-# Fonction principale
+# Main function
 # ---------------------------------------------------------------------------
 
 def run_investment_frontier(
@@ -105,31 +106,31 @@ def run_investment_frontier(
     verbose: bool = True,
 ) -> pd.DataFrame:
     """
-    Recherche itérative de la taille maximale d'investissement rentable
-    pour chaque scénario (schéma tarifaire).
+    Iteratively search for the maximum profitable investment size
+    for each scenario (tariff scheme).
 
     Parameters
     ----------
     params : dict
-        Dictionnaire de paramètres lu par settings.read().
+        Parameter dictionary read by settings.read().
     scenario_cases : list[str]
-        Noms des scénarios à analyser (ex. ['scenario_1', 'scenario_2']).
+        Names of the scenarios to analyze, e.g. ['scenario_1', 'scenario_2'].
     DF_PRICE, DF_LOAD : pd.DataFrame
     hr_result : HurdleRateResult
-        Résultat CAPM/WACC — fournit le hurdle_rate.
+        CAPM/WACC result that provides the hurdle_rate.
     output_dir : str
-        Répertoire de sortie pour les CSV.
+        Output directory for CSV files.
     verbose : bool
 
     Returns
     -------
     pd.DataFrame
-        Tableau de synthèse : une ligne par scénario avec les indicateurs
-        de la dernière taille rentable et de la première taille non rentable.
+        Summary table: one row per scenario with indicators for the last
+        profitable size and the first non-profitable size.
     """
     os.makedirs(output_dir, exist_ok=True)
 
-    # Paramètres communs (lus sur scenario_1 comme convention du projet)
+    # Common parameters, read from scenario_1 as the project convention.
     p1      = params["scenario_1"]["global"]
     start   = int(p1["config"]["start"])
     end     = int(p1["config"]["end"])
@@ -144,7 +145,7 @@ def run_investment_frontier(
                             params["scenario_1"]["global"]["network"]["base_tariff"]))
         delta       = float(ps["tariff"]["delta"])
         step_size   = float(ps["parameter"].get("step_size", 100))
-        max_size    = float(ps["parameter"].get("size", 10 * step_size))
+        max_size    = float(ps["parameter"].get("size", 5 * step_size))
 
         shape       = ps["tariff"]["shape"]
         config      = ps["tariff"]["configuration"]
@@ -152,8 +153,8 @@ def run_investment_frontier(
 
         if verbose:
             print(f"\n{'='*60}")
-            print(f"Scénario : {scenario}  |  Tarif : {shape}  |  Config : {config}")
-            print(f"  Step : {step_size} kWh  |  Max testé : {max_size} kWh")
+            print(f"Scenario : {scenario}  |  Tariff : {shape}  |  Config : {config}")
+            print(f"  Step : {step_size} MWh  |  Max tested : {max_size} MWh")
             print(f"  Hurdle rate : {hurdle_rate*100:.2f} %")
 
         scenario_records: List[dict] = []
@@ -163,9 +164,10 @@ def run_investment_frontier(
         size = step_size
         while size <= max_size + 1e-6:
             if verbose:
-                print(f"  → Taille {size:.0f} kWh …", end=" ", flush=True)
+                print(f"  -> Size {size:.0f} MWh ...", end=" ", flush=True)
 
             # 1. Dispatch
+            """ 
             try:
                 df = _run_dispatch_for_size(
                     params, scenario, size,
@@ -174,17 +176,24 @@ def run_investment_frontier(
                     start, end,
                 )
             except Exception as exc:
-                print(f"ERREUR dispatch : {exc}")
+                print(f"Dispatch error: {exc}")
                 break
-
+            """
+            df = _run_dispatch_for_size(
+                    params, scenario, size,
+                    DF_PRICE, DF_LOAD,
+                    base_tariff, VOLL, delta,
+                    start, end,
+                )
+            
             if df.empty:
-                print("aucune donnée")
+                print("no data")
                 break
 
-            # 2. Revenu annuel moyen
+            # 2. Average annual revenue
             annual_rev = annualize_dispatch_revenue(df, start, end)
 
-            # 3. Indicateurs financiers
+            # 3. Financial indicators
             financials = _build_financials(params, scenario, size, hurdle_rate)
             npv_res    = compute_npv(financials, annual_rev)
 
@@ -200,22 +209,22 @@ def run_investment_frontier(
             scenario_records.append(row)
 
             if verbose:
-                status = "✓ viable" if npv_res.is_viable else "✗ non viable"
-                print(f"NPV = {npv_res.npv:+,.0f} €  IRR = "
+                status = "viable" if npv_res.is_viable else "not viable"
+                print(f"NPV = {npv_res.npv:+,.0f} EUR  IRR = "
                       f"{npv_res.irr*100:.1f}%  {status}"
                       if npv_res.irr is not None
-                      else f"NPV = {npv_res.npv:+,.0f} €  IRR = N/A  {status}")
+                      else f"NPV = {npv_res.npv:+,.0f} EUR  IRR = N/A  {status}")
 
             if npv_res.is_viable:
                 last_viable = npv_res
             else:
                 first_non_viable = npv_res
-                # La frontière est atteinte : on s'arrête
+                # The frontier has been reached: stop.
                 break
 
             size += step_size
 
-        # Sauvegarde détaillée par scénario
+        # Detailed save by scenario
         if scenario_records:
             df_scen = pd.DataFrame(scenario_records)
             df_scen.to_csv(
@@ -223,7 +232,7 @@ def run_investment_frontier(
                 index=False,
             )
 
-        # Ligne de synthèse
+        # Summary row
         summary_rows.append(_build_summary_row(
             scenario, descriptor, shape, config, delta, hurdle_rate,
             last_viable, first_non_viable,
@@ -236,7 +245,7 @@ def run_investment_frontier(
 
     if verbose:
         print("\n\n" + "=" * 60)
-        print("  RÉSUMÉ — FRONTIÈRE D'INVESTISSEMENT")
+        print("  SUMMARY - INVESTMENT FRONTIER")
         print("=" * 60)
         _print_summary(df_summary)
 
@@ -244,7 +253,7 @@ def run_investment_frontier(
 
 
 # ---------------------------------------------------------------------------
-# Helpers internes
+# Internal helpers
 # ---------------------------------------------------------------------------
 
 def _build_summary_row(

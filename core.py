@@ -1,11 +1,12 @@
 """
-core.py  (version étendue avec module d'investissement)
-=========================================================
-Fonctions d'orchestration du projet :
-  - lecture scénarios et données
-  - lancement du dispatch optimizer
-  - NOUVEAU : analyse de la frontière d'investissement (CAPM + NPV)
+core.py  (extended version with investment module)
+==================================================
+Project orchestration functions:
+  - read scenarios and data
+  - run the dispatch optimizer
+  - NEW: investment frontier analysis (CAPM + NPV)
 """
+
 
 import os
 import settings
@@ -13,13 +14,13 @@ import pandas as pd
 
 from storage_dispatch.batterydispatch import bat_optimize_
 
-# ── Nouveau module d'investissement ────────────────────────────────────────
+# -- New investment module ---------------------------------------------------
 from investment.capm import compute_hurdle_rate, capm_from_params, CAPMInputs
 from investment.investment_frontier import run_investment_frontier
 
 
 # ===========================================================================
-# Lecture des données
+# Data loading
 # ===========================================================================
 
 def readStorageDispatchScenario(SCENARIO_LIST):
@@ -98,7 +99,7 @@ def runStorageDispatchCases(params, scenario_cases, SHADOW_PRICE, base_tariff, D
         STORAGE_RESULT[scenario] = df_combined
         df_combined.to_csv(os.path.join(output_dir, f"storage_result_{scenario}.csv"), index=False)
 
-    # Coûts récupérés
+    # Recovered costs
     STORAGE_RESULT_TEMP   = STORAGE_RESULT.copy()
     recovered_cost_tariff = []
     recovered_cost_price  = []
@@ -234,7 +235,7 @@ def runStorageConfiguration(params, scenario_cases, SHADOW_PRICE, base_tariff, D
 
 
 # ===========================================================================
-# NOUVEAU : Module d'investissement
+# NEW: Investment module
 # ===========================================================================
 
 def computeHurdleRate(params, scenario: str = "scenario_1",
@@ -244,21 +245,21 @@ def computeHurdleRate(params, scenario: str = "scenario_1",
                       cost_of_debt: float = 0.045,
                       tax_rate: float = 0.30):
     """
-    Calcule le hurdle rate via CAPM/WACC.
+    Calculate the hurdle rate via CAPM/WACC.
 
-    Le taux sans risque (rf) et la prime de risque projet (k) sont lus
-    depuis le fichier de scénarios.  Les autres paramètres peuvent être
-    surchargés via les arguments.
+    The risk-free rate (rf) and the project risk premium (k) are read
+    from the scenario file. The other parameters can be overridden
+    through the function arguments.
 
     Parameters
     ----------
-    params : dict          Paramètres du fichier scénarios.
-    scenario : str         Scénario de référence (par défaut scenario_1).
-    beta : float           Béta du projet (risque systématique).
-    market_premium : float Prime de risque de marché (ERP).
-    equity_share : float   Part des fonds propres dans la structure de capital.
-    cost_of_debt : float   Coût de la dette avant impôt.
-    tax_rate : float       Taux marginal d'imposition.
+    params : dict          Parameters from the scenario file.
+    scenario : str         Reference scenario (default: scenario_1).
+    beta : float           Project beta (systematic risk).
+    market_premium : float Market risk premium (ERP).
+    equity_share : float   Equity share in the capital structure.
+    cost_of_debt : float   Pre-tax cost of debt.
+    tax_rate : float       Marginal tax rate.
 
     Returns
     -------
@@ -293,11 +294,11 @@ def runInvestmentFrontier(params, scenario_cases, DF_PRICE, DF_LOAD,
                           output_dir: str = "results/investment",
                           verbose: bool = True):
     """
-    Lance l'analyse de la frontière d'investissement pour chaque scénario.
+    Run the investment frontier analysis for each scenario.
 
-    Pour chaque scénario, augmente progressivement la taille de la batterie
-    (par pas de `step_size` défini dans le CSV de scénarios) et calcule la
-    NPV.  S'arrête dès que la NPV devient négative.
+    For each scenario, progressively increases the battery size
+    by the `step_size` defined in the scenario CSV and computes the
+    NPV. Stops as soon as the NPV becomes negative.
 
     Parameters
     ----------
@@ -305,13 +306,13 @@ def runInvestmentFrontier(params, scenario_cases, DF_PRICE, DF_LOAD,
     scenario_cases : list[str]
     DF_PRICE, DF_LOAD : pd.DataFrame
     hr_result : HurdleRateResult, optional
-        Si None, calculé automatiquement depuis scenario_1.
+        If None, automatically computed from scenario_1.
     output_dir : str
     verbose : bool
 
     Returns
     -------
-    pd.DataFrame  Tableau de synthèse.
+    pd.DataFrame  Summary table.
     """
     if hr_result is None:
         hr_result = computeHurdleRate(params)
