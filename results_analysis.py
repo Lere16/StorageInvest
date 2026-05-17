@@ -11,7 +11,7 @@ from plotly.offline import plot
 import os
 import altair as alt
 from datetime import datetime, timedelta
-from altair_saver import save
+#from altair_saver import save
 from matplotlib.colors import to_hex
 import plotly.express as px
 import plotly.figure_factory as ff

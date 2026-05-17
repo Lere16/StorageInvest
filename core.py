@@ -264,6 +264,7 @@ def computeHurdleRate(params, scenario: str = "scenario_1",
     -------
     HurdleRateResult
     """
+    
     p = params.get(scenario, params.get("scenario_1", {}))
     global_p = p.get("global", {}).get("parameter", {})
 
